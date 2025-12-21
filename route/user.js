@@ -1,9 +1,9 @@
 import express from "express"
 import { CreateStudents, deleteUser, getAllStudents, getUserById, LoginUser, updateUser } from "../controller/user.js"
-import {protect} from "../authguard/authguard.js"
+// import {protect} from "../authguard/authguard.js"
 const router=express.Router()
 router.post('/register',CreateStudents)
-router.get('/',protect, getAllStudents)
+router.get('/', getAllStudents)
 router.get('/:id',getUserById)
 router.post('/login',LoginUser)
 router.put('/update/:id',updateUser)
