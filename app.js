@@ -7,7 +7,7 @@ import cors from 'cors'
 
 const app= express();
 
-const allowedOrigins=["http://localhost:5173","https://localhost:5173"];
+const allowedOrigins=["http://localhost:5173","https://localhost:5173","https://backend-dmwx.onrender.com","http://backend-dmwx.onrender.com","https://localhost:5174","http://localhost:5174"];
 app.use(
   cors({
     origin: function (origin, callback) {

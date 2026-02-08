@@ -6,7 +6,7 @@ const cohortfourschema= new mongoose.Schema(
         Password:{type:String,required:true},
         Country:{type:String},
         Address:{type:String},
-
+emailConfirmed:{type:Boolean}
     }, {timestamps:true}
 )
 const cohortfour=mongoose.model("cohortfours",cohortfourschema)

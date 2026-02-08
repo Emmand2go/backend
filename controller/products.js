@@ -16,7 +16,7 @@ export const getProductById=async(req, res) =>{
 }catch(error){res.status(500).json}({message:error.message})}
 
 export const getAllProducts = async(req,res)=>{
-    try{let goods=await products.find() //.select('-price')
+    try{let products=await products.find() //.select('-price')
         res.status(200).json(goods)
     }catch(error){res.status(500).json({message:'Server Error',error})}
 }

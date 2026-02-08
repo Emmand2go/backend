@@ -1,26 +1,127 @@
 import stave from "../model/user.js"
 import bcrypt, { compare } from "bcryptjs"
 import jwt from "jsonwebtoken"
+import TempStudent from "../model/tempUser.js";
+import crypto from "crypto";
+import { sendotpEmail } from "../utilis/brevo.js";
 
 
 // create
-export const CreateStudents= async(req, res)=>{
-    const { Name, Email, PhoneNo, Password, Country, Address } = req.body;
-    try{
-        const exist=await stave.findOne({Email})
-        if (exist) return res.status(400).json({message:"Email Already Exist"});
-            const phone=await stave.findOne({PhoneNo})
-        if (phone) return res.status(400).json({message:"Phone no Already Exist"});
-// Create user with hashedpassword
-        const salt = await bcrypt.genSalt(10);
-const hashedpassword = await bcrypt.hash(Password, salt);
-            const Students=await stave.create({Name,Email,PhoneNo,Password:hashedpassword,
-        Country,Address})
-        return res.status(201).json({message:"Registration Successful",Students})
-    }catch (error){console.error(error)
-        res.status(500).json({message:"Server Error",error})
-    }
-}
+// export const CreateStudents= async(req, res)=>{
+//     const { Name,PhoneNo, Password, Country, Address, } = req.body;
+//     const Email = req.body.Email.toLowerCase();
+//     try{
+//         const exist=await stave.findOne({Email})
+//         if (exist) return res.status(400).json({message:"Email Already Exist"});
+//             const phone=await stave.findOne({PhoneNo})
+//         if (phone) return res.status(400).json({message:"Phone no Already Exist"});
+// // Create user with hashedpassword
+//         const salt = await bcrypt.genSalt(10);
+// const hashedpassword = await bcrypt.hash(Password, salt);
+//             const Students=await stave.create({Name,Email,PhoneNo,Password:hashedpassword,
+//         Country,Address})
+//         return res.status(201).json({message:"Registration Successful",Students})
+//     }catch (error){console.error(error)
+//         res.status(500).json({message:"Server Error",error})
+//     }
+// }
+
+
+export const CreateStudents = async (req, res) => {
+  const { Name, PhoneNo, Password, Country, Address } = req.body;
+  const Email = req.body.Email.toLowerCase();
+
+  try {
+    // Check real users
+    if (await stave.findOne({ Email }))
+      return res.status(400).json({ message: "Email already exists" });
+
+    if (await stave.findOne({ PhoneNo }))
+      return res.status(400).json({ message: "Phone no already exists" });
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedpassword = await bcrypt.hash(Password, salt);
+
+    // Generate OTP
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const hashedOtp = crypto
+      .createHash("sha256")
+      .update(otp)
+      .digest("hex");
+
+    // Save TEMP student (upsert = resend OTP case)
+    await TempStudent.findOneAndUpdate(
+      { Email },
+      {
+        Name,
+        Email,
+        PhoneNo,
+        Password: hashedpassword,
+        Country,
+        Address,
+        emailOtp: hashedOtp,
+        emailOtpExpires: Date.now() + 5 * 60 * 1000
+      },
+      { upsert: true, new: true }
+    );
+
+    // Send OTP
+    await sendotpEmail({Email, otp,Name});
+
+    return res.status(200).json({
+      message: "OTP sent to email. Please verify to complete registration"
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+export const VerifyUserEmail = async (req, res) => {
+  const { Email, otp } = req.body;
+
+  try {
+    const tempStudent = await TempStudent.findOne({ Email: Email.toLowerCase() });
+
+    if (!tempStudent)
+      return res.status(400).json({ message: "OTP expired or invalid" });
+
+    if (Date.now() > tempStudent.emailOtpExpires)
+      return res.status(400).json({ message: "OTP expired" });
+
+    const hashedOtp = crypto
+      .createHash("sha256")
+      .update(otp)
+      .digest("hex");
+
+    if (hashedOtp !== tempStudent.emailOtp)
+      return res.status(400).json({ message: "Invalid OTP" });
+
+    // Create REAL student
+    const student = await stave.create({
+      Name: tempStudent.Name,
+      Email: tempStudent.Email,
+      PhoneNo: tempStudent.PhoneNo,
+      Password: tempStudent.Password,
+      Country: tempStudent.Country,
+      Address: tempStudent.Address,
+      emailConfirmed: true
+    });
+
+    // Delete temp record
+    await TempStudent.deleteOne({ Email });
+
+    res.status(201).json({
+      message: "Email verified. Registration completed",
+      student
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 
 // Get all user and by id
 export const getAllStudents = async(req,res)=>{
@@ -38,7 +139,8 @@ try{const user=await stave.findById(userId) //.select('-Password')
 
 // Login user
 export const LoginUser= async(req,res)=>{
-    const {Email, Password}=req.body
+    const {Password}=req.body
+    const Email = req.body.Email.toLowerCase();
     try{
         const user =await stave.findOne({Email});
         if(!user) return res.status(404).json({message:"Email Not Registered"})
