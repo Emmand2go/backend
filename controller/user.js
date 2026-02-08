@@ -67,7 +67,7 @@ export const CreateStudents = async (req, res) => {
     );
 
     // Send OTP
-    await sendotpEmail({Email, otp,Name});
+    await sendotpEmail(Email, otp);
 
     return res.status(200).json({
       message: "OTP sent to email. Please verify to complete registration"

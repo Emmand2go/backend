@@ -43,7 +43,7 @@ dotenv.config();
  * @param {string} [param0.Name] - recipient name (optional)
  */
 
-export const sendotpEmail = async ({ Email, Name, otp }={}) => {
+export const sendotpEmail = async ( Email, Name, otp) => {
      if (!Email || !otp) {
     throw new Error("Email and OTP are required to send email");
   }
@@ -56,19 +56,14 @@ export const sendotpEmail = async ({ Email, Name, otp }={}) => {
           email: "sender@brevo.com",
           name: "ND rep",
         },
-        to: [
-          {
-            email: Email,
-            name: Name || "User",  // from request
-          },
-        ],
-        subject: "Your OTP Code",
-        htmlContent: `
-          <p>Hello ${Name || "there"},</p>
-          <p>Your OTP is:</p>
-          <h2>${otp}</h2>
-          <p>This code will expire in 5 minutes.</p>
-        `,
+        to: [{ Email }],
+        subject: "Your OTP Verification Code",
+      htmlContent: `
+        <h2>Email Verification</h2>
+        <p>Your OTP is:</p>
+        <h1>${otp}</h1>
+        <p>This code expires in 10 minutes.</p>
+      `,
       },
       {
         headers: {
@@ -89,4 +84,3 @@ export const sendotpEmail = async ({ Email, Name, otp }={}) => {
   }
 };
 
-sendotpEmail();
