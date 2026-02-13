@@ -1,9 +1,14 @@
 import stave from "../model/user.js"
 import bcrypt, { compare } from "bcryptjs"
 import jwt from "jsonwebtoken"
+// const jwt = require('jsonwebtoken');
 import TempStudent from "../model/tempUser.js";
 import crypto from "crypto";
+import Brevo from "@getbrevo/brevo"
 import { sendotpEmail } from "../utilis/brevo.js";
+// import SibApiV3Sdk from "sib-api-v3-sdk"
+import dotenv from "dotenv"
+dotenv.config();
 
 
 // create
@@ -29,9 +34,14 @@ import { sendotpEmail } from "../utilis/brevo.js";
 
 export const CreateStudents = async (req, res) => {
   const { Name, PhoneNo, Password, Country, Address } = req.body;
-  const Email = req.body.Email.toLowerCase();
+  const Email = req.body.Email?.toLowerCase();
+  
 
   try {
+    console.log("STAVE MODEL:", !!stave);
+    console.log("REGISTER BODY:", req.body);
+    console.log("My Key is:", process.env.BREVO_API_KEY);
+    
     // Check real users
     if (await stave.findOne({ Email }))
       return res.status(400).json({ message: "Email already exists" });
@@ -45,6 +55,9 @@ export const CreateStudents = async (req, res) => {
 
     // Generate OTP
     const otp = crypto.randomInt(100000, 999999).toString();
+    // const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(otp);
+    
     const hashedOtp = crypto
       .createHash("sha256")
       .update(otp)
@@ -63,18 +76,41 @@ export const CreateStudents = async (req, res) => {
         emailOtp: hashedOtp,
         emailOtpExpires: Date.now() + 5 * 60 * 1000
       },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument:'after',setDefaultsOnInsert: true }
     );
 
-    // Send OTP
-    await sendotpEmail(Email, otp);
+    // // ✅ Setup Brevo client here
+    // const defaultClient = SibApiV3Sdk.ApiClient.instance;
+    // defaultClient.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
+    // const brevoEmailApi = new SibApiV3Sdk.TransactionalEmailsApi();
+
+    // // ✅ Setup Brevo client
+    // const brevoEmailApi = new Brevo.TransactionalEmailsApi();
+    // brevoEmailApi.setApiKey(
+    //   Brevo.TransactionalEmailsApiApiKeys.apiKey,
+    //   process.env.BREVO_API_KEY
+    // );
+
+     // 📧 Send OTP (isolated so it can't crash server)
+     // await brevoEmailApi.sendTransacEmail(Email,otp);
+    try {
+      await sendotpEmail(Email, otp);
+    } catch (emailError) {
+      console.error("EMAIL ERROR:", emailError.message);
+      return res.status(500).json({
+        message: "Failed to send OTP email",
+      });
+    }
 
     return res.status(200).json({
       message: "OTP sent to email. Please verify to complete registration"
     });
+    
   } catch (error) {
+    console.error("Full Error", error);
+    
     console.error(error);
-    res.status(500).json({ message: "Server Error" });
+    res.status(500).json({ message: error.message,stack:error.stack });
   }
 };
 
@@ -82,7 +118,7 @@ export const VerifyUserEmail = async (req, res) => {
   const { Email, otp } = req.body;
 
   try {
-    const tempStudent = await TempStudent.findOne({ Email: Email.toLowerCase() });
+    const tempStudent = await TempStudent.findOne({ Email});
 
     if (!tempStudent)
       return res.status(400).json({ message: "OTP expired or invalid" });
@@ -142,6 +178,7 @@ export const LoginUser= async(req,res)=>{
     const {Password}=req.body
     const Email = req.body.Email.toLowerCase();
     try{
+      console.log("Is JWT loaded?", !!jwt);
         const user =await stave.findOne({Email});
         if(!user) return res.status(404).json({message:"Email Not Registered"})
     //         if (Password !== user.Password) {

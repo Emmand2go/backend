@@ -6,8 +6,11 @@ const cohortfourschema= new mongoose.Schema(
         Password:{type:String,required:true},
         Country:{type:String},
         Address:{type:String},
-emailConfirmed:{type:Boolean}
-    }, {timestamps:true}
-)
+emailConfirmed: {
+  type: Boolean,
+  default: false,
+},
+    }, {timestamps:true},
+{ bufferCommands: false })
 const cohortfour=mongoose.model("cohortfours",cohortfourschema)
 export default cohortfour
