@@ -10,6 +10,8 @@ emailConfirmed: {
   type: Boolean,
   default: false,
 },
+resetToken:{type:String},
+resetTokenExpiry:{type:Date},
     }, {timestamps:true},
 { bufferCommands: false })
 const cohortfour=mongoose.model("cohortfours",cohortfourschema)

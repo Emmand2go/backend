@@ -8,6 +8,7 @@ import Brevo from "@getbrevo/brevo"
 import { sendotpEmail } from "../utilis/brevo.js";
 // import SibApiV3Sdk from "sib-api-v3-sdk"
 import dotenv from "dotenv"
+import sendReset from "../utilis/reset-paswrd.js";
 dotenv.config();
 
 
@@ -36,6 +37,11 @@ export const CreateStudents = async (req, res) => {
   const { Name, PhoneNo, Password, Country, Address } = req.body;
   const Email = req.body.Email?.toLowerCase();
   
+  if (!Password || Password.length < 6) {
+  return res.status(400).json({
+    error: "Password must be at least 6 characters long"
+  });
+}
 
   try {
     console.log("STAVE MODEL:", !!stave);
@@ -62,6 +68,21 @@ export const CreateStudents = async (req, res) => {
       .createHash("sha256")
       .update(otp)
       .digest("hex");
+
+        // Check if there is an existing temp user record for this email
+    const existingTempStudent = await TempStudent.findOne({ Email});
+
+    if (existingTempStudent) {
+      // If OTP expired, delete the old record and generate a new one
+      if (Date.now() > existingTempStudent.emailOtpExpires) {
+        await TempStudent.deleteOne({ Email});
+        console.log("Old OTP expired, deleting record and generating new OTP");
+      } else {
+        return res.status(400).json({
+          message: "OTP already sent. Please verify your email."
+        });
+      }
+    }
 
     // Save TEMP student (upsert = resend OTP case)
     await TempStudent.findOneAndUpdate(
@@ -116,20 +137,42 @@ export const CreateStudents = async (req, res) => {
 
 export const VerifyUserEmail = async (req, res) => {
   const { Email, otp } = req.body;
+  console.log("--- Verification Start ---");
+  console.log("Received Email:", Email);
+  console.log("Received OTP:", otp);
 
   try {
+    // const tempStudent = await TempStudent.findOne({ Email});
+
+    // if (!tempStudent)
+    //   return res.status(400).json({ message: "OTP expired or invalid" });
+
+    // if (Date.now() > tempStudent.emailOtpExpires)
+    //   return res.status(400).json({ message: "OTP expired" });
+    // 1. Find the temporary record
     const tempStudent = await TempStudent.findOne({ Email});
+    console.log("TempUser Found?:", !!tempStudent);
 
     if (!tempStudent)
-      return res.status(400).json({ message: "OTP expired or invalid" });
+      return res.status(400).json({ message: "No registration in progress for this email" });
 
-    if (Date.now() > tempStudent.emailOtpExpires)
-      return res.status(400).json({ message: "OTP expired" });
+    // 2. Check if expired
+    if (Date.now() > tempStudent.emailOtpExpires) {
+      await TempStudent.deleteOne({ Email }); // Clean up expired record
+      return res.status(400).json({ message: "OTP expired. Please register again." });
+    }
+    console.log("Current Time: ", Date.now());
+  console.log("Expiry Time:  ", tempStudent.emailOtpExpires);
+  console.log("Is Expired?:  ", Date.now() > tempStudent.emailOtpExpires);
 
     const hashedOtp = crypto
       .createHash("sha256")
       .update(otp)
       .digest("hex");
+
+      console.log("Hashed Input OTP:", hashedOtp);
+  console.log("Stored OTP Hash: ", tempStudent.emailOtp);
+  console.log("Match Status:    ", hashedOtp === tempStudent.emailOtp);
 
     if (hashedOtp !== tempStudent.emailOtp)
       return res.status(400).json({ message: "Invalid OTP" });
@@ -227,3 +270,82 @@ export const deleteUser=async(req,res)=>{const userId=req.params.id
     }catch(error){res.staus(500).json({message:"Server Error"})}
 
 }
+
+// Reset password
+export const forgotPassword = async (req, res) => {
+  try {
+    const { Email } = req.body;
+
+    const user = await stave.findOne({ Email });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Generate secure token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    user.resetToken = hashedToken;
+    user.resetTokenExpiry = Date.now() + 15 * 60 * 1000; // 15 mins
+    await user.save();
+
+    // Create reset link
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+console.log("Frontend URL:", process.env.FRONTEND_URL);
+    // Email content
+    const message = `
+      <h2>Password Reset Request</h2>
+      <p>Hi ${user.Name},</p>
+      <p>We received a request to reset your password.</p>
+      <p>Click the link below to reset it (expires in 15 minutes):</p>
+      <a href="${resetUrl}" target="_blank">Reset Password</a>
+      <p>If you didn't request this, ignore this email.</p>
+    `;
+
+    await sendReset({ to: user.Email, subject: "Password Reset", html: message });
+
+    res.json({ message: "Reset link sent to your email" });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    console.log("Token received:", token);
+//if it shows this incorrect:7dd033aa27dbbd1545db49be01d4e8fd113cacf466a291b3766d26fd7810fec5]Reset Password, correct one is only the no    
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters long" });
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    console.log("Hashed token:", hashedToken);
+
+    const user = await stave.findOne({
+      resetToken: hashedToken,
+      resetTokenExpiry: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired token" });
+    }
+
+    user.Password = await bcrypt.hash(newPassword, 10);
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+
+    await user.save();
+
+    res.json({ message: "Password reset successful" });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
+  }
+};

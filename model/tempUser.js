@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 const tempUserSchema = new mongoose.Schema({
   Name: String,
-  Email: { type: String, unique: true },
-  PhoneNo: {type:String,unique:true},
+  Email: { type: String, unique: false },
+  PhoneNo: {type:String,unique:false},
   Password: { type: String, required: true },
   Country: String,
   Address: String,
