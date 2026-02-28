@@ -1,11 +1,12 @@
 import dotenv from "dotenv"
-dotenv.config()
+dotenv.config();
 import express from "express"
 import mongoose from "mongoose"
 import userRoute from "./route/user.js"
 import product from './route/products.js'
+import orderRoute from './route/orders.js'
 import cors from 'cors'
-
+import { errorHandler } from "./authguard/errorhandler.js";
 const app= express();
 
 const allowedOrigins=["http://localhost:5173","https://localhost:5173","https://backend-dmwx.onrender.com","http://backend-dmwx.onrender.com","https://localhost:5174","http://localhost:5174"];
@@ -26,17 +27,43 @@ app.use(
 );
 
 app.use (express.json());
-dotenv.config();
-app.listen(4000,()=>{
-    console.log(`backend is running in port ${process.env.PORT}`)
-})
-app.use('/api/users',userRoute)
-app.use('/api/product',product)
-app.get('/',(req,res)=>{res.send('Hello queen HOW ARE YOU')})
+
+// B1..app.listen(4000,()=>{
+//     console.log(`backend is running in port ${process.env.PORT}`)
+// })
+app.use('/api/users',userRoute);
+app.use('/api/product',product);
+app.use('/api/order',orderRoute);
+app.get('/',(req,res)=>{res.send('Hello queen HOW ARE YOU')});
+
+app.use((err, req, res, next) => {
+  console.error("Global Error Log:", err.stack); // Still log to terminal for you
+  
+  const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  
+  res.status(statusCode).json({
+    message: err.message || "Internal Server Error",
+    // Only show stack trace if you're not in production
+    stack: process.env.NODE_ENV === 'production' ? null : err.stack,
+  });
+});
+
 mongoose.connect(process.env.MONGODB_URL)
-.then(()=>{console.log("connected to my database")})
-.catch(()=>{console.log("E no connect oh");
-})
+  .then(() => {
+    console.log("Connected to database");
+
+    app.listen(4000, () => {
+      console.log("Backend running on port 4000");
+    });
+
+  })
+  .catch((err) => {
+    console.error("MongoDB connection failed:", err.message);
+  });
+// B2..mongoose.connect(process.env.MONGODB_URL)
+// .then(()=>{console.log("connected to my database")})
+// .catch(()=>{console.log("E no connect oh");
+// })
 
 // const connectDB = async () => {
 //   try {

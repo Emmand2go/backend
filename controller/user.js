@@ -229,7 +229,7 @@ export const LoginUser= async(req,res)=>{
    const isMatch= await compare(Password,user.Password)
 if(!isMatch) return res.status(404).json({message:"Incorrect password"});
 const token=jwt.sign({id:user._id},
-    process.env.SECRET_KEY,{expiresIn:"3m"})
+    process.env.SECRET_KEY,{expiresIn:"2d"})
     res.status(200).json({message:"Login Successful",token,
         user:{id:user._id,Name:user.Name,Email:user.Email,PhoneNo:user.PhoneNumber,Country:user.Country,Address:user.Address}
     })    
