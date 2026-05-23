@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import User from "../model/user.js";
+import cohortfour from "../model/user.js";
 
 export const protect = async (req, res, next) => {
   let token;
@@ -11,12 +11,10 @@ export const protect = async (req, res, next) => {
 
       // Verify token
       const decoded = jwt.verify(token, process.env.SECRET_KEY);
-      // req.user.id = decoded.id; // this is the permanent _id
-      //   // ✅ Set only user ID from token
-      // req.user = { _id: decoded.id };
+      console.log("Decoded Token Payload:", decoded);
 
       // Attach user to request (hide password)
-      req.user = await User.findById(decoded.id).select("-password").lean();
+      req.user = await cohortfour.findById(decoded.id||decoded._id).select("-password").lean();
       
 
       if (!req.user) {
@@ -25,12 +23,17 @@ export const protect = async (req, res, next) => {
 
       return next();
     } catch (error) {
-      return res.status(401).json({ message: "Not authorized, token failed" });
+      console.error("Authguard Error:", error);
+      // Handle expired vs invalid tokens
+      if (error.name === "TokenExpiredError") {
+        return res.status(401).json({ message: "Token expired" });
     }
+ return res.status(401).json({ message: "Not authorized, invalid token" });
+    }
+  } else {
+    return res.status(401).json({ message: "Not authorized, no token provided" });
   }
-
-  return res.status(401).json({ message: "Not authorized, no token provided" });
-}
+};
 
 
 // import jwt from "jsonwebtoken";

@@ -11,7 +11,7 @@ const orderSchema = new mongoose.Schema({
   email: { type: String, required: true },
   ageGroup: { type: String, required: true },
   price:{type:String},
-  basePrice: { type: Number, required: true },
+  basePrice: { type: Number, required: false },
   finalPrice: { type: Number, required: true,validate: {
       validator: function(value) {
         return value >= this.basePrice;

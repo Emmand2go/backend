@@ -4,12 +4,13 @@ import jwt from "jsonwebtoken"
 // const jwt = require('jsonwebtoken');
 import TempStudent from "../model/tempUser.js";
 import crypto from "crypto";
-import Brevo from "@getbrevo/brevo"
+// import Brevo from "@getbrevo/brevo"
 import { sendotpEmail } from "../utilis/brevo.js";
 // import SibApiV3Sdk from "sib-api-v3-sdk"
 import dotenv from "dotenv"
 import sendReset from "../utilis/reset-paswrd.js";
 dotenv.config();
+// import Order from "../model/orders.js";
 
 
 // create
@@ -349,3 +350,5 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+

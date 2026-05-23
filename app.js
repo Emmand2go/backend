@@ -6,8 +6,20 @@ import userRoute from "./route/user.js"
 import product from './route/products.js'
 import orderRoute from './route/orders.js'
 import cors from 'cors'
-import { errorHandler } from "./authguard/errorhandler.js";
+// import { errorHandler } from "./authguard/errorhandler.js";
 const app= express();
+
+// 1. Database Connection Logic (Optimized for Serverless)
+const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) return;
+  try {
+    await mongoose.connect(process.env.MONGODB_URL);
+    console.log("MongoDB Connected");
+  } catch (err) {
+    console.error("MongoDB connection error:", err.message);
+  }
+};
+connectDB();
 
 const allowedOrigins=["http://localhost:5173","https://localhost:5173","https://backend-dmwx.onrender.com","http://backend-dmwx.onrender.com","https://localhost:5174","http://localhost:5174"];
 app.use(
@@ -79,3 +91,6 @@ mongoose.connect(process.env.MONGODB_URL)
 // };
 
 // connectDB();
+
+// 7. CRITICAL FOR VERCEL
+export default app;

@@ -1,4 +1,5 @@
 import Order from '../model/orders.js'
+import stave from "../model/user.js"
 import customImage from '../model/CustomImage.js';
 import axios from "axios"
 import { v4 as uuidv4 } from 'uuid';
@@ -12,9 +13,9 @@ const RUSH_FEE = Number(process.env.RUSH_FEE) || 20000;
 // ✅ Create Order Controller
 export const createOrder = async (req, res) => {
   try {
+    const email=req.body.Email.toLowerCase();
     const {
       name,
-      email,
       ageGroup,
       price,
       basePrice,
@@ -86,7 +87,7 @@ console.log(req.user);
 
     // 4️⃣ Save Order
     const newOrder = new Order({
-      user: req.user._id, // comes from token
+      user: req.user._id || req.user.id, // comes from token
       name,
       email,
       ageGroup,
@@ -178,8 +179,8 @@ if (
 
       order.paymentStatus = "paid";
       order.paymentData = paymentData;
-      order.status="Payment Confirmed",
-      order.progress=25
+      order.status="Payment Confirmed";
+      order.progress=25;
       await order.save();
 
       return res.status(200).json({
@@ -272,7 +273,7 @@ export const updateProgress = async (req, res) => {
 
     res.json(order);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error1" });
   }
 };
 
@@ -293,28 +294,67 @@ export const getOrderByReference = async (req, res) => {
   }
 };
 
-export const getMyOrders = async (req, res) => {
-  try {
-    console.log("req.user:", req.user);
-    console.log("req.user._id:", req.user?._id);
-     if (!req.user || !req.user._id) {
-      res.status(401).json({ message: "User not attached properly" });
-      return next(error);
-    }
+// export const getMyOrders = async (req, res) => {
+//   try {
+//     console.log("req.user:", req.user);
+//     console.log("req.user._id:", req.user?._id);
+//      if (!req.user || !req.user._id) {
+//       res.status(401).json({ message: "User not attached properly" });
+//       return next(error);
+//     }
 
-    // const userId = orders.user.$oid;
-    // const userId = req.user._id;
-    // req.user is set by your auth middleware
-    const orders = await Order.find({user: req.user._id}).sort({ createdAt: -1 }).populate("user", "name email ageGroup deliveryDate status progress");;
-    return res.status(200).json(orders); // always an array
-    // if (!orders.length) {
-    //   return res.status(404).json({ message: "No orders found" });
+//     const userId = orders.user.$oid;
+//     // const userId = req.user._id;
+//     // req.user is set by your auth middleware
+//     const orders = await Order.find({userId}).sort({ createdAt: -1 }) //.populate("user", "name email ageGroup deliveryDate status progress");
+//     return res.status(200).json(orders); // always an array
+//     // if (!orders.length) {
+//     //   return res.status(404).json({ message: "No orders found" });
+//     // }
+
+//   } catch (error) {
+//     console.error("getMyOrders error:", error);
+//     res.status(500).json({ message: "Server error" });
+//     next(error);
+//   }
+// };
+
+
+export const getMyOrder = async (req, res) => {
+  try {
+    // const email = req.params.Email;
+    // // const { email } = req.query; // Get the email from the query string
+
+    // // Validate if email is provided
+    // if (!email) {
+    //   return res.status(400).json({ message: "Email is required." });
     // }
 
+    // // Find user by email
+    // const user = await stave.findOne({ email});
+    // if (!user) {
+    //   return res.status(404).json({ message: "User not found." });
+    // }
+    // Ensure the user is authenticated and attached to req
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: "Unauthorized: User not found" });
+    }
+
+    // Fetch orders associated with this user
+    const orders = await Order.find({ user:req.user._id }).sort({ createdAt: -1 });;
+
+    if (orders.length === 0) {
+      return res.status(404).json({ message: "No orders found for this user." });
+    }
+
+    // Return the ordersa
+    res.status(200).json({
+      message: "Orders found",
+      orders:orders||[]
+    });
   } catch (error) {
-    console.error("getMyOrders error:", error);
-    res.status(500).json({ message: "Server error" });
-    next(error);
+    console.error("Error in getMyOrder controller:", error);
+    res.status(500).json({ message: "Server ErroR.", details: error.message });
   }
 };
 
@@ -380,7 +420,7 @@ export const saveCustomerDetails = async (req, res) => {
   try {
     const { id } = req.params;
     const details = req.body;
-
+const { deliveryDate, basePrice } = details;
     const image = await customImage.findById(id);
 
     if (!image) {
@@ -422,15 +462,26 @@ if (selectedDate < minimumDate) {
     };
 
     image.customerDetails = details;
+    image.finalPrice = finalPrice; // 👈 CRITICAL: Save the calculated final price
+    image.isRush = isRush;
     image.status = "pending_payment";
   
 
     await image.save();
 
-    res.json({ success: true });
+    res.json({ success: true, 
+      message: "Customer details saved successfully.",
+      data: {
+        finalPrice,
+        isRush,
+        status: image.status}
+       });   // added  here and next
 
   } catch (error) {
-    res.status(500).json({ success: false });
+    console.error("Error in saveCustomerDetails:", error);
+    res.status(500).json({ success: false, 
+      message: "Server error while saving customer details.",
+      details: error.message });
   }
 };
 
